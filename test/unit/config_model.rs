@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+use std::io::Cursor;
+use std::path::PathBuf;
 
 use hatch::config::{CommandConfig, Config, ConfigError};
 use serde_yaml::Value;
@@ -43,7 +45,7 @@ log_level: info
 
 #[test]
 fn rejects_invalid_config_with_multiple_diagnostics() {
-    let path = write_temp_config(
+    let error = check_config(
         "invalid-config.yaml",
         r#"
 commands:
@@ -51,9 +53,8 @@ commands:
     run: "  "
   missing-run: {}
 "#,
-    );
-
-    let error = Config::check_path(&path).expect_err("config should be invalid");
+    )
+    .expect_err("config should be invalid");
 
     let ConfigError::Invalid(report) = error else {
         panic!("expected invalid config report");
@@ -70,16 +71,15 @@ commands:
 
 #[test]
 fn reports_parse_errors_with_location_context() {
-    let path = write_temp_config(
+    let error = check_config(
         "parse-error.yaml",
         r#"
 commands:
   broken
     run: nope
 "#,
-    );
-
-    let error = Config::check_path(&path).expect_err("config should fail to parse");
+    )
+    .expect_err("config should fail to parse");
 
     let rendered = error.to_string();
     assert!(rendered.contains("failed to parse YAML"));
@@ -87,12 +87,6 @@ commands:
     assert!(rendered.contains("broken"));
 }
 
-fn write_temp_config(name: &str, contents: &str) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "hatch-{}-{}",
-        std::process::id(),
-        name
-    ));
-    std::fs::write(&path, contents).expect("temp config should be writable");
-    path
+fn check_config(name: &str, contents: &str) -> Result<(), ConfigError> {
+    Config::check_reader(PathBuf::from(name), Cursor::new(contents.as_bytes()))
 }

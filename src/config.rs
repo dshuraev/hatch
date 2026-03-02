@@ -3,6 +3,7 @@ use std::env;
 use std::error::Error;
 use std::fmt;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -36,6 +37,13 @@ impl Config {
 
     pub fn check_path(path: &Path) -> Result<(), ConfigError> {
         ConfigDocument::load(path)?.validate()
+    }
+
+    pub fn check_reader<R>(path: impl Into<PathBuf>, reader: R) -> Result<(), ConfigError>
+    where
+        R: Read,
+    {
+        ConfigDocument::read(path.into(), reader)?.validate()
     }
 
     pub fn default_path() -> Result<PathBuf, ConfigError> {
@@ -91,6 +99,20 @@ impl ConfigDocument {
             source,
             value,
         })
+    }
+
+    fn read<R>(path: PathBuf, mut reader: R) -> Result<Self, ConfigError>
+    where
+        R: Read,
+    {
+        let mut source = String::new();
+        reader
+            .read_to_string(&mut source)
+            .map_err(|source| ConfigError::Read {
+                path: path.clone(),
+                source,
+            })?;
+        Self::parse(&path, source)
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
