@@ -42,6 +42,14 @@ tasks:
     cmds:
       - cargo deny check
 
+  coverage:
+    desc: Generate coverage reports
+    cmds:
+      - mkdir -p {{.REPORTS_DIR}}/coverage-html
+      - cargo llvm-cov --text --ignore-filename-regex '/test/' | tee {{.REPORTS_DIR}}/coverage.txt
+      - cargo llvm-cov --lcov --ignore-filename-regex '/test/' --output-path {{.REPORTS_DIR}}/coverage.lcov
+      - cargo llvm-cov --html --ignore-filename-regex '/test/' --output-dir {{.REPORTS_DIR}}/coverage-html
+
   geiger:
     desc: Report unsafe Rust usage (informational)
     cmds:
@@ -94,3 +102,4 @@ tasks:
       - task: miri
       - task: fuzz:all
       - task: coupling
+      - task: coverage
