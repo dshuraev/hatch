@@ -164,3 +164,54 @@ It is not:
 It is a deterministic SSH command gateway.
 
 Small, explicit, composable.
+
+## Build And Verify
+
+Local development and CI use the same `task` targets:
+
+```bash
+task ci
+```
+
+This fast gate verifies:
+
+* formatting
+* clippy with warnings denied
+* unit and integration tests
+* `cargo-deny`
+* locked release build
+
+For the full heavyweight suite, including Miri, fuzzing, coverage, unsafe usage reporting, and size analysis:
+
+```bash
+task check
+```
+
+## Release Process
+
+Prepare a release locally with:
+
+```bash
+task release
+```
+
+That command runs the fast gate, checks dependency advisories, and builds an auditable release binary with `cargo-auditable`.
+
+Tagged releases are published by GitHub Actions when a tag matching `v*` is pushed. The release workflow:
+
+* rebuilds the project in release mode with `--locked`
+* produces an auditable `hatch` binary
+* creates a Linux tarball with `README.md` and `LICENSE`
+* publishes SHA-256 checksums
+
+`cargo-bloat` is available as an informational report:
+
+```bash
+task bloat
+```
+
+Use it before shipping when binary size matters, but it is intentionally not part of the blocking CI gate.
+
+## Contributing
+
+Contributor workflow, coding expectations, and release guidelines are documented in `CONTRIBUTING.md`.
