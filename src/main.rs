@@ -7,7 +7,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     match hatch::app::run(cli) {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(code) => code,
         Err(error) => {
             eprintln!("{error}");
             ExitCode::FAILURE
