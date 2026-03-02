@@ -73,3 +73,20 @@ impl From<DispatchError> for AppError {
         AppError::Dispatch(value)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::exit_code_from_status;
+    use std::process::ExitCode;
+
+    #[cfg(unix)]
+    use std::os::unix::process::ExitStatusExt;
+
+    #[test]
+    #[cfg(unix)]
+    fn returns_failure_when_process_has_no_exit_code() {
+        let status = std::process::ExitStatus::from_raw(9);
+
+        assert_eq!(exit_code_from_status(status), ExitCode::FAILURE);
+    }
+}
