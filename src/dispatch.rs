@@ -88,13 +88,8 @@ mod tests {
 
     fn sample_config() -> Config {
         let mut commands = BTreeMap::new();
-        commands.insert(
-            "lock-screen".to_string(),
-            CommandConfig {
-                run: "loginctl lock-session".to_string(),
-            },
-        );
-        Config { commands }
+        commands.insert("lock-screen".to_string(), CommandConfig::new("loginctl lock-session"));
+        Config::new(commands)
     }
 
     #[test]

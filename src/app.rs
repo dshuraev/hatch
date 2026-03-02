@@ -7,8 +7,8 @@ use crate::dispatch::{dispatch, DispatchError};
 pub fn run(cli: Cli) -> Result<ExitCode, AppError> {
     match cli.command {
         Some(Command::Check { path }) => {
-            let config = Config::load_from_path(&path)?;
-            check_config(&config);
+            Config::check_path(&path)?;
+            check_config();
             Ok(ExitCode::SUCCESS)
         }
         None => {
@@ -27,7 +27,7 @@ fn run_config(config: &Config) -> Result<ExitCode, AppError> {
     Ok(exit_code_from_status(status))
 }
 
-fn check_config(_config: &Config) {
+fn check_config() {
     // Stub for the future config checker.
 }
 

@@ -24,11 +24,6 @@ fn dispatch_requires_ssh_original_command() {
 
 fn sample_config() -> Config {
     let mut commands = BTreeMap::new();
-    commands.insert(
-        "lock-screen".to_string(),
-        CommandConfig {
-            run: "printf dispatched".to_string(),
-        },
-    );
-    Config { commands }
+    commands.insert("lock-screen".to_string(), CommandConfig::new("printf dispatched"));
+    Config::new(commands)
 }
