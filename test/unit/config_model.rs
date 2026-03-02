@@ -1,9 +1,6 @@
-#[path = "../../src/config.rs"]
-mod config;
-
 use std::collections::BTreeMap;
 
-use config::{CommandConfig, Config};
+use hatch::config::{CommandConfig, Config, ConfigError};
 
 #[test]
 fn deserializes_readme_config_shape() {
@@ -32,4 +29,15 @@ commands:
     );
 
     assert_eq!(config.commands, expected);
+}
+
+#[test]
+fn rejects_empty_command_map() {
+    let config = Config {
+        commands: BTreeMap::new(),
+    };
+
+    let error = config.validate().expect_err("config should be invalid");
+
+    assert!(matches!(error, ConfigError::Invalid(_)));
 }
