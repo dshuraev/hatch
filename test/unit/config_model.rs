@@ -18,8 +18,14 @@ commands:
     let config: Config = serde_yaml::from_str(yaml).expect("config should deserialize");
 
     let mut expected = BTreeMap::new();
-    expected.insert("lock-screen".to_string(), CommandConfig::new("loginctl lock-session"));
-    expected.insert("restart-app".to_string(), CommandConfig::new("systemctl restart app"));
+    expected.insert(
+        "lock-screen".to_string(),
+        CommandConfig::new("loginctl lock-session"),
+    );
+    expected.insert(
+        "restart-app".to_string(),
+        CommandConfig::new("systemctl restart app"),
+    );
 
     assert_eq!(config.commands, expected);
 }
@@ -36,7 +42,10 @@ log_level: info
 
     let config: Config = serde_yaml::from_str(yaml).expect("config should deserialize");
 
-    assert_eq!(config.extra.get("log_level"), Some(&Value::String("info".to_string())));
+    assert_eq!(
+        config.extra.get("log_level"),
+        Some(&Value::String("info".to_string()))
+    );
     assert_eq!(
         config.commands["lock-screen"].extra.get("timeout"),
         Some(&Value::Number(30.into()))

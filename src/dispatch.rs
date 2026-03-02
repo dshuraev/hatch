@@ -6,7 +6,11 @@ use std::process::{Command, ExitStatus};
 use crate::config::Config;
 
 pub fn dispatch(config: &Config) -> Result<ExitStatus, DispatchError> {
-    dispatch_with(config, env::var("SSH_ORIGINAL_COMMAND").ok(), execute_shell_command)
+    dispatch_with(
+        config,
+        env::var("SSH_ORIGINAL_COMMAND").ok(),
+        execute_shell_command,
+    )
 }
 
 fn dispatch_with<F>(
@@ -69,7 +73,10 @@ impl fmt::Display for DispatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DispatchError::MissingOriginalCommand => {
-                write!(f, "SSH_ORIGINAL_COMMAND must be set to a configured command key")
+                write!(
+                    f,
+                    "SSH_ORIGINAL_COMMAND must be set to a configured command key"
+                )
             }
             DispatchError::UnknownCommand(command) => {
                 write!(f, "command `{command}` is not defined in config")
@@ -95,7 +102,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::io;
 
-    use super::{dispatch_with, DispatchError};
+    use super::{DispatchError, dispatch_with};
     use crate::config::{CommandConfig, Config};
 
     #[cfg(unix)]
@@ -103,7 +110,10 @@ mod tests {
 
     fn sample_config() -> Config {
         let mut commands = BTreeMap::new();
-        commands.insert("lock-screen".to_string(), CommandConfig::new("loginctl lock-session"));
+        commands.insert(
+            "lock-screen".to_string(),
+            CommandConfig::new("loginctl lock-session"),
+        );
         Config::new(commands)
     }
 
@@ -117,18 +127,26 @@ mod tests {
 
     #[test]
     fn rejects_unknown_command() {
-        let error = dispatch_with(&sample_config(), Some("restart-app".to_string()), |_| {
-            unreachable!()
-        })
+        let error = dispatch_with(
+            &sample_config(),
+            Some("restart-app".to_string()),
+            |_| unreachable!(),
+        )
         .expect_err("dispatch should fail");
 
-        assert!(matches!(error, DispatchError::UnknownCommand(command) if command == "restart-app"));
+        assert!(
+            matches!(error, DispatchError::UnknownCommand(command) if command == "restart-app")
+        );
     }
 
     #[test]
     fn rejects_blank_ssh_original_command() {
-        let error = dispatch_with(&sample_config(), Some("   ".to_string()), |_| unreachable!())
-            .expect_err("dispatch should fail");
+        let error = dispatch_with(
+            &sample_config(),
+            Some("   ".to_string()),
+            |_| unreachable!(),
+        )
+        .expect_err("dispatch should fail");
 
         assert!(matches!(error, DispatchError::MissingOriginalCommand));
     }
@@ -136,7 +154,10 @@ mod tests {
     #[test]
     fn surfaces_executor_failures() {
         let error = dispatch_with(&sample_config(), Some("lock-screen".to_string()), |_| {
-            Err(io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"))
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "permission denied",
+            ))
         })
         .expect_err("dispatch should fail");
 
@@ -150,10 +171,14 @@ mod tests {
 
     #[test]
     fn executes_matched_command() {
-        let status = dispatch_with(&sample_config(), Some("lock-screen".to_string()), |command| {
-            assert_eq!(command, "loginctl lock-session");
-            Ok(success_status())
-        })
+        let status = dispatch_with(
+            &sample_config(),
+            Some("lock-screen".to_string()),
+            |command| {
+                assert_eq!(command, "loginctl lock-session");
+                Ok(success_status())
+            },
+        )
         .expect("dispatch should succeed");
 
         assert!(status.success());

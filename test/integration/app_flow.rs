@@ -132,8 +132,8 @@ struct TestDir {
 impl TestDir {
     fn new() -> Self {
         let unique = NEXT_TEST_DIR_ID.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir()
-            .join(format!("hatch-app-flow-{}-{}", std::process::id(), unique));
+        let path =
+            std::env::temp_dir().join(format!("hatch-app-flow-{}-{}", std::process::id(), unique));
         fs::create_dir_all(&path).expect("temp dir should be created");
         Self { path }
     }

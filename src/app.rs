@@ -2,7 +2,7 @@ use std::process::ExitCode;
 
 use crate::cli::{Cli, Command};
 use crate::config::{Config, ConfigError};
-use crate::dispatch::{dispatch, DispatchError};
+use crate::dispatch::{DispatchError, dispatch};
 
 pub fn run(cli: Cli) -> Result<ExitCode, AppError> {
     match cli.command {

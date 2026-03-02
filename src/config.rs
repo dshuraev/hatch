@@ -91,7 +91,11 @@ impl ConfigDocument {
                 message: format!("failed to parse YAML: {source_error}"),
                 location,
             };
-            ConfigError::Invalid(ConfigReport::new(path.to_path_buf(), source.clone(), vec![diagnostic]))
+            ConfigError::Invalid(ConfigReport::new(
+                path.to_path_buf(),
+                source.clone(),
+                vec![diagnostic],
+            ))
         })?;
 
         Ok(Self {
@@ -206,7 +210,10 @@ impl From<serde_yaml::Location> for DiagnosticLocation {
 #[derive(Debug)]
 pub enum ConfigError {
     MissingConfigHome,
-    Read { path: PathBuf, source: std::io::Error },
+    Read {
+        path: PathBuf,
+        source: std::io::Error,
+    },
     Invalid(ConfigReport),
 }
 
@@ -214,7 +221,10 @@ impl fmt::Display for ConfigError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ConfigError::MissingConfigHome => {
-                write!(f, "unable to resolve config directory from XDG_CONFIG_HOME or HOME")
+                write!(
+                    f,
+                    "unable to resolve config directory from XDG_CONFIG_HOME or HOME"
+                )
             }
             ConfigError::Read { path, source } => {
                 write!(f, "failed to read config from {}: {source}", path.display())
@@ -252,10 +262,8 @@ fn validate_root(value: &Value, source: &str) -> Vec<ConfigDiagnostic> {
         None => {
             diagnostics.push(ConfigDiagnostic {
                 message: "config must define a top-level `commands` mapping".to_string(),
-                location: locate_key(source, &["commands"]).or(Some(DiagnosticLocation {
-                    line: 1,
-                    column: 1,
-                })),
+                location: locate_key(source, &["commands"])
+                    .or(Some(DiagnosticLocation { line: 1, column: 1 })),
             });
             return diagnostics;
         }
@@ -378,7 +386,12 @@ fn locate_key(source: &str, path: &[&str]) -> Option<DiagnosticLocation> {
 
         stack.push((indent, key.clone()));
 
-        if stack.len() == path.len() && stack.iter().map(|(_, key)| key.as_str()).eq(path.iter().copied()) {
+        if stack.len() == path.len()
+            && stack
+                .iter()
+                .map(|(_, key)| key.as_str())
+                .eq(path.iter().copied())
+        {
             let column = indent + 1;
             return Some(DiagnosticLocation {
                 line: line_index + 1,
