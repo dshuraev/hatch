@@ -6,9 +6,10 @@ vars:
 
 tasks:
   default:
-    desc: Show available tasks
+    desc: Check & build
     cmds:
-      - task --list
+      - task: check
+      - task: build
 
   build:
     desc: Build the project
@@ -41,7 +42,7 @@ tasks:
       - cargo deny check
 
   geiger:
-    desc: Report unsafe Rust usage
+    desc: Report unsafe Rust usage (informational)
     cmds:
       - cargo geiger || true
 
@@ -77,11 +78,11 @@ tasks:
 
 
   check:
-    desc: Run all configured checks except fuzzing
-    deps:
-      - clippy
-      - audit
-      - deny
-      - geiger
-      - miri
-      - fuzz:all
+    desc: Run all configured checks
+    cmds:
+      - task: clippy
+      - task: audit
+      - task: deny
+      - task: geiger
+      - task: miri
+      - task: fuzz:all
