@@ -38,7 +38,21 @@ where
 }
 
 fn execute_shell_command(command: &str) -> Result<ExitStatus, std::io::Error> {
-    Command::new("/bin/sh").arg("-c").arg(command).status()
+    shell_command(command).status()
+}
+
+#[cfg(unix)]
+fn shell_command(command: &str) -> Command {
+    let mut process = Command::new("/bin/sh");
+    process.arg("-c").arg(command);
+    process
+}
+
+#[cfg(windows)]
+fn shell_command(command: &str) -> Command {
+    let mut process = Command::new("cmd.exe");
+    process.arg("/C").arg(command);
+    process
 }
 
 #[derive(Debug)]

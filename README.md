@@ -4,7 +4,7 @@ A lightweight SSH-based command dispatcher and middleware.
 
 ## What it does
 
-`hatch` lets you execute a pre-registered set of commands on your machine over SSH without ever exposing the shell.
+`hatch` lets you execute a pre-registered set of commands on your machine over SSH without exposing an interactive shell to the SSH client.
 
 ## How it works
 
@@ -23,7 +23,7 @@ When a client runs something like `ssh user@host lock-screen`, SSH exposes `lock
 `SSH_ORIGINAL_COMMAND` environment variable. `hatch` reads that value, validates the config, and matches the
 original command exactly against a key under `commands`.
 
-If a matching entry is found, `hatch` executes its `run` value via `/bin/sh -c`. For example, this config:
+If a matching entry is found, `hatch` executes its `run` value via the platform shell. On Unix-like systems this is currently `/bin/sh -c`. The `run` value is treated as trusted machine-owner configuration, while the incoming SSH command is matched exactly against configured keys. For example, this config:
 
 ```yaml
 commands:
@@ -47,8 +47,10 @@ commands:
     run: systemctl restart app
 ```
 
+## Platform support
+
+`hatch` currently targets Unix-like environments with SSH `ForceCommand` support. Windows support is planned, but the current setup instructions and examples assume a Unix-like host.
+
 ## Why not use plain SSH?
 
-Regular SSH key gives full shell access. `hatch` enforces minimal privilege policy
-while providing a clean API. It allows you to define a controlled, auditable set of
-actions - nothing more.
+Regular SSH key gives full shell access. `hatch` narrows that down to an exact-match command dispatcher backed by trusted local configuration, giving you a controlled, auditable set of actions instead of a general interactive login shell.
