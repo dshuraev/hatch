@@ -55,6 +55,24 @@ commands:
 }
 
 #[test]
+fn check_reports_missing_config_file() {
+    let temp = TestDir::new();
+    let missing = temp.path().join("missing.yaml");
+
+    let output = hatch_command()
+        .arg("check")
+        .arg(&missing)
+        .output()
+        .expect("check command should run");
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("failed to read config"));
+    assert!(stderr.contains("missing.yaml"));
+}
+
+#[test]
 fn dispatch_returns_executed_command_exit_code() {
     let temp = TestDir::new();
     let config = temp.write_config(
@@ -74,6 +92,32 @@ commands:
         .expect("dispatch command should run");
 
     assert_eq!(output.status.code(), Some(7));
+    assert!(String::from_utf8_lossy(&output.stderr).is_empty());
+}
+
+#[test]
+fn dispatch_uses_default_config_path_from_xdg_config_home() {
+    let temp = TestDir::new();
+    let config_dir = temp.create_dir("xdg/hatch");
+    let config = config_dir.join("hatch.yaml");
+
+    fs::write(
+        &config,
+        r#"
+commands:
+  fail-nine:
+    run: exit 9
+"#,
+    )
+    .expect("config file should be written");
+
+    let output = hatch_command()
+        .env("XDG_CONFIG_HOME", temp.path().join("xdg"))
+        .env("SSH_ORIGINAL_COMMAND", "fail-nine")
+        .output()
+        .expect("dispatch command should run");
+
+    assert_eq!(output.status.code(), Some(9));
     assert!(String::from_utf8_lossy(&output.stderr).is_empty());
 }
 
@@ -98,6 +142,16 @@ impl TestDir {
         let path = self.path.join(name);
         fs::write(&path, contents).expect("config file should be written");
         path
+    }
+
+    fn create_dir(&self, path: &str) -> PathBuf {
+        let path = self.path.join(path);
+        fs::create_dir_all(&path).expect("directory should be created");
+        path
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
     }
 }
 
