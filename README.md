@@ -15,8 +15,25 @@ command="/usr/local/bin/hatch" ssh-ed25519 AAAA...
 ```
 
 From that point on, any SSH connection using that key is routed through `hatch` instead of a client shell.
-When a client runs something like `ssh user@host lock-screen`, `hatch` checks that the command is registered
-and executes a binary.
+
+By default, `hatch` reads its config from `$XDG_CONFIG_HOME/hatch/hatch.yaml`. You can override that path with
+`hatch --config ./path/to/config.yaml` or `hatch -c ./path/to/config.yaml`.
+
+When a client runs something like `ssh user@host lock-screen`, SSH exposes `lock-screen` through the
+`SSH_ORIGINAL_COMMAND` environment variable. `hatch` reads that value, validates the config, and matches the
+original command exactly against a key under `commands`.
+
+If a matching entry is found, `hatch` executes its `run` value via `/bin/sh -c`. For example, this config:
+
+```yaml
+commands:
+  lock-screen:
+    run: loginctl lock-session
+```
+
+allows `ssh user@host lock-screen` to dispatch `loginctl lock-session`.
+
+`hatch check ./path/to/config.yaml` validates a config file without dispatching any command.
 
 ## Configuration
 
