@@ -93,6 +93,7 @@ impl Error for DispatchError {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::io;
 
     use super::{dispatch_with, DispatchError};
     use crate::config::{CommandConfig, Config};
@@ -122,6 +123,29 @@ mod tests {
         .expect_err("dispatch should fail");
 
         assert!(matches!(error, DispatchError::UnknownCommand(command) if command == "restart-app"));
+    }
+
+    #[test]
+    fn rejects_blank_ssh_original_command() {
+        let error = dispatch_with(&sample_config(), Some("   ".to_string()), |_| unreachable!())
+            .expect_err("dispatch should fail");
+
+        assert!(matches!(error, DispatchError::MissingOriginalCommand));
+    }
+
+    #[test]
+    fn surfaces_executor_failures() {
+        let error = dispatch_with(&sample_config(), Some("lock-screen".to_string()), |_| {
+            Err(io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"))
+        })
+        .expect_err("dispatch should fail");
+
+        assert!(matches!(
+            error,
+            DispatchError::Execute { command, source }
+                if command == "lock-screen"
+                && source.kind() == io::ErrorKind::PermissionDenied
+        ));
     }
 
     #[test]
