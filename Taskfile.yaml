@@ -1,5 +1,9 @@
 version: "3"
 
+vars:
+  FUZZ_TARGETS:
+    - "config_check_reader"
+
 tasks:
   default:
     desc: Show available tasks
@@ -46,6 +50,32 @@ tasks:
     cmds:
       - cargo +nightly miri test
 
+  fuzz:all:
+    desc: Run fuzzer
+    run: always
+    env:
+      RUST_BACKTRACE: "1"
+    vars:
+      SANITIZER: address
+      MAX_LEN: 4096
+      TIMEOUT: 5
+      RSS_LIMIT_MB: 4096
+      USE_VALUE_PROFILE: 1
+      RUNS: 0
+      EXTRA_FLAGS: ""
+    cmds:
+      - for: {var: FUZZ_TARGETS}
+        cmd: >
+          cargo +nightly fuzz run "{{trimSuffix ".rs" .ITEM}}"
+          --sanitizer {{.SANITIZER}} --
+          -runs={{.RUNS}}
+          -max_len={{.MAX_LEN}}
+          -timeout={{.TIMEOUT}}
+          -use_value_profile={{.USE_VALUE_PROFILE}}
+          -print_final_stats=1
+          {{.EXTRA_FLAGS}}
+
+
   check:
     desc: Run all configured checks except fuzzing
     deps:
@@ -54,3 +84,4 @@ tasks:
       - deny
       - geiger
       - miri
+      - fuzz:all

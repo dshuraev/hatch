@@ -2,6 +2,7 @@
 name = "hatch"
 version = "0.1.0"
 edition = "2024"
+license = "AGPL-3.0-or-later"
 
 [[test]]
 name = "config_model"

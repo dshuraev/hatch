@@ -1,0 +1,21 @@
+[package]
+name = "hatch-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.hatch]
+path = ".."
+
+[[bin]]
+name = "config_check_reader"
+path = "fuzz_targets/config_check_reader.rs"
+test = false
+doc = false
+bench = false
