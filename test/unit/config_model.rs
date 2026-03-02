@@ -70,6 +70,88 @@ commands:
 }
 
 #[test]
+fn rejects_non_mapping_root() {
+    let error = check_config("non-mapping-root.yaml", "- just\n- a\n- list\n")
+        .expect_err("config should be invalid");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("config root must be a YAML mapping"));
+}
+
+#[test]
+fn rejects_missing_commands_mapping() {
+    let error = check_config(
+        "missing-commands.yaml",
+        r#"
+log_level: info
+"#,
+    )
+    .expect_err("config should be invalid");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("config must define a top-level `commands` mapping"));
+}
+
+#[test]
+fn rejects_non_mapping_commands_value() {
+    let error = check_config(
+        "commands-not-mapping.yaml",
+        r#"
+commands: []
+"#,
+    )
+    .expect_err("config should be invalid");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("top-level `commands` value must be a mapping"));
+}
+
+#[test]
+fn rejects_empty_commands_mapping() {
+    let error = check_config(
+        "empty-commands.yaml",
+        r#"
+commands: {}
+"#,
+    )
+    .expect_err("config should be invalid");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("config must define at least one command"));
+}
+
+#[test]
+fn rejects_non_mapping_command_entry() {
+    let error = check_config(
+        "command-not-mapping.yaml",
+        r#"
+commands:
+  lock-screen: loginctl lock-session
+"#,
+    )
+    .expect_err("config should be invalid");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("command `lock-screen` must be a mapping"));
+}
+
+#[test]
+fn rejects_non_string_run_value() {
+    let error = check_config(
+        "non-string-run.yaml",
+        r#"
+commands:
+  lock-screen:
+    run: 42
+"#,
+    )
+    .expect_err("config should be invalid");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("command `lock-screen` field `run` must be a string"));
+}
+
+#[test]
 fn reports_parse_errors_with_location_context() {
     let error = check_config(
         "parse-error.yaml",
