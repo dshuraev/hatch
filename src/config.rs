@@ -324,7 +324,7 @@ fn validate_command_entry(
 }
 
 fn mapping_get<'a>(mapping: &'a Mapping, key: &str) -> Option<&'a Value> {
-    mapping.get(&Value::String(key.to_string()))
+    mapping.get(Value::String(key.to_string()))
 }
 
 fn locate_key(source: &str, path: &[&str]) -> Option<DiagnosticLocation> {
@@ -411,12 +411,12 @@ fn render_located_diagnostic(
         message
     );
 
-    for current in start..=end {
+    for (current, line) in lines.iter().enumerate().take(end + 1).skip(start) {
         rendered.push('\n');
         rendered.push_str(&format!(
             "{:>width$} | {}",
             current + 1,
-            lines[current],
+            line,
             width = width
         ));
 
