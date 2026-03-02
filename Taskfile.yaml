@@ -41,6 +41,11 @@ tasks:
     cmds:
       - cargo geiger || true
 
+  miri:
+    desc: Check for UB
+    cmds:
+      - cargo +nightly miri test
+
   check:
     desc: Run all configured checks except fuzzing
     deps:
@@ -48,3 +53,4 @@ tasks:
       - audit
       - deny
       - geiger
+      - miri
