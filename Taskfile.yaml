@@ -1,0 +1,50 @@
+version: "3"
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the project
+    cmds:
+      - cargo build
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - cargo clean
+
+  format:
+    desc: Format Rust sources
+    cmds:
+      - cargo fmt
+
+  clippy:
+    desc: Run clippy with warnings denied
+    cmds:
+      - cargo clippy -- -D warnings
+
+  audit:
+    desc: Audit dependencies for known vulnerabilities
+    cmds:
+      - cargo audit
+
+  deny:
+    desc: Run cargo-deny checks
+    cmds:
+      - cargo deny check
+
+  geiger:
+    desc: Report unsafe Rust usage
+    cmds:
+      - cargo geiger || true
+
+  check:
+    desc: Run all configured checks except fuzzing
+    deps:
+      - clippy
+      - audit
+      - deny
+      - geiger
