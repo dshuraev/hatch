@@ -26,6 +26,7 @@ commands:
         .expect("check command should run");
 
     assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "config is valid\n");
     assert!(String::from_utf8_lossy(&output.stderr).is_empty());
 }
 

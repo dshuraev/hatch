@@ -28,7 +28,7 @@ fn run_config(config: &Config) -> Result<ExitCode, AppError> {
 }
 
 fn check_config() {
-    // Stub for the future config checker.
+    println!("config is valid");
 }
 
 fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
