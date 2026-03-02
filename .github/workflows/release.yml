@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install go-task
+        uses: arduino/setup-task@v2
+
+      - name: Install release tools
+        run: cargo install cargo-auditable --locked
+
+      - name: Verify release inputs
+        run: task release
+
+      - name: Prepare release bundle
+        run: |
+          mkdir -p dist
+          cp LICENSE dist/LICENSE
+          cp README.md dist/README.md
+          tar -C dist -czf dist/hatch-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz hatch LICENSE README.md
+          sha256sum dist/hatch dist/hatch-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz > dist/sha256sums.txt
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/hatch
+            dist/hatch-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
+            dist/sha256sums.txt
+
