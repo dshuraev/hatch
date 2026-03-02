@@ -16,6 +16,10 @@ path = "test/unit/cli.rs"
 name = "dispatch"
 path = "test/unit/dispatch.rs"
 
+[[test]]
+name = "app_flow"
+path = "test/integration/app_flow.rs"
+
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
