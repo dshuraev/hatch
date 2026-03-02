@@ -2,6 +2,7 @@ version: "3"
 
 vars:
   REPORTS_DIR: reports
+  RELEASE_DIR: dist
   FUZZ_TARGETS:
     - "config_check_reader"
 
@@ -15,7 +16,12 @@ tasks:
   build:
     desc: Build the project
     cmds:
-      - cargo build
+      - cargo build --locked
+
+  build:release:
+    desc: Build release artifacts
+    cmds:
+      - cargo build --release --locked
 
   clean:
     desc: Remove build artifacts
@@ -23,14 +29,19 @@ tasks:
       - cargo clean
 
   format:
-    desc: Format Rust sources
+    desc: Verify Rust formatting
     cmds:
-      - cargo fmt
+      - cargo fmt --all --check
 
   clippy:
     desc: Run clippy with warnings denied
     cmds:
-      - cargo clippy -- -D warnings
+      - cargo clippy --all-targets --all-features -- -D warnings
+
+  test:
+    desc: Run unit and integration tests
+    cmds:
+      - cargo test --all-targets --locked
 
   audit:
     desc: Audit dependencies for known vulnerabilities
@@ -92,14 +103,43 @@ tasks:
       - mkdir -p {{.REPORTS_DIR}}
       - cargo coupling | tee {{.REPORTS_DIR}}/coupling.md
 
-  check:
-    desc: Run all configured checks
+  auditable:
+    desc: Build auditable release binary
     cmds:
+      - mkdir -p {{.RELEASE_DIR}}
+      - cargo auditable build --release --locked
+      - cp target/release/hatch {{.RELEASE_DIR}}/hatch
+
+  bloat:
+    desc: Report release binary size contributors (informational)
+    cmds:
+      - mkdir -p {{.REPORTS_DIR}}
+      - cargo bloat --release --crates | tee {{.REPORTS_DIR}}/bloat.txt || true
+
+  ci:
+    desc: Run the fast CI gate
+    cmds:
+      - task: format
       - task: clippy
-      - task: audit
+      - task: test
       - task: deny
+      - task: build:release
+
+  release:
+    desc: Verify release inputs and build auditable artifacts
+    cmds:
+      - task: ci
+      - task: audit
+      - task: auditable
+
+  check:
+    desc: Run all configured checks, including heavyweight analysis
+    cmds:
+      - task: ci
+      - task: audit
       - task: geiger
       - task: miri
       - task: fuzz:all
       - task: coupling
+      - task: bloat
       - task: coverage
