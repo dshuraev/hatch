@@ -11,10 +11,17 @@ This project follows the working agreement in `AGENTS.md`:
 
 ## Tooling
 
-Required local tools:
+Required local tools are pinned in `mise.toml`. Install them with:
 
-* stable Rust toolchain
-* `go-task`
+```bash
+mise install
+```
+
+That installs:
+
+* Rust `1.89.0`
+* Rust `nightly-2025-10-31` for `miri` and fuzzing
+* `task` `3.48.0`
 * `cargo-deny`
 * `cargo-auditable` for release builds
 
@@ -25,20 +32,25 @@ Optional tools for heavyweight verification:
 * `cargo-geiger`
 * `cargo-llvm-cov`
 * `cargo-fuzz`
-* nightly Rust with `miri`
 * `cargo-coupling`
 
 ## Development Workflow
 
 1. Make the smallest testable change.
 2. Add or update tests under `test/unit/` or `test/integration/` as appropriate.
-3. Run the fast verification gate:
+3. Install or update the pinned toolchain:
+
+   ```bash
+   mise install
+   ```
+
+4. Run the fast verification gate:
 
    ```bash
    task ci
    ```
 
-4. Before opening a release-oriented or riskier change, run the heavyweight suite:
+5. Before opening a release-oriented or riskier change, run the heavyweight suite:
 
    ```bash
    task check

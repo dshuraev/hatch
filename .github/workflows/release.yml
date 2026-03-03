@@ -15,20 +15,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install go-task
-        uses: arduino/setup-task@v2
-
-      - name: Install release tools
-        run: cargo install cargo-auditable --locked
+      - name: Install mise and pinned tools
+        uses: jdx/mise-action@v2
+        with:
+          version: 2026.1.11
 
       - name: Verify release inputs
-        run: task release
+        run: mise exec -- task release
 
       - name: Prepare release bundle
         run: |
@@ -45,4 +38,3 @@ jobs:
             dist/hatch
             dist/hatch-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
             dist/sha256sums.txt
-

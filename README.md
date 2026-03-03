@@ -167,6 +167,12 @@ Small, explicit, composable.
 
 ## Build And Verify
 
+Install the pinned toolchain and repo utilities with:
+
+```bash
+mise install
+```
+
 Local development and CI use the same `task` targets:
 
 ```bash

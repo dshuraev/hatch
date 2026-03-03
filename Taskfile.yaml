@@ -70,7 +70,7 @@ tasks:
   miri:
     desc: Check for UB
     cmds:
-      - cargo +nightly miri test
+      - cargo +nightly-2025-10-31 miri test
 
   fuzz:all:
     desc: Run fuzzer
@@ -88,7 +88,7 @@ tasks:
     cmds:
       - for: {var: FUZZ_TARGETS}
         cmd: >
-          cargo +nightly fuzz run "{{trimSuffix ".rs" .ITEM}}"
+          cargo +nightly-2025-10-31 fuzz run "{{trimSuffix ".rs" .ITEM}}"
           --sanitizer {{.SANITIZER}} --
           -runs={{.RUNS}}
           -max_len={{.MAX_LEN}}
