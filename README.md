@@ -18,7 +18,7 @@ Granting SSH access normally means granting shell access. Even when restricted, 
 
 * A centralized declarative configuration
 * Deterministic exact-match dispatching
-* No interactive shell exposure
+* No interactive shell exposure via SSH
 * Auditable command surface
 * Simple validation before deployment
 
