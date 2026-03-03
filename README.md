@@ -1,4 +1,4 @@
-# hatch
+# `hatch` (in active development)
 
 A secure SSH command gateway for controlled remote execution.
 
