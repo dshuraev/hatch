@@ -19,6 +19,10 @@ jobs:
         uses: jdx/mise-action@v2
         with:
           version: 2026.1.11
+          cache_key_prefix: mise-v1
+
+      - name: Install Rust components
+        run: rustup component add --toolchain 1.89.0-x86_64-unknown-linux-gnu rustfmt clippy
 
       - name: Verify release inputs
         run: mise exec -- task release
