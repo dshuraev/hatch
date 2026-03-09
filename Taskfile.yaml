@@ -30,6 +30,7 @@ tasks:
     desc: Remove build artifacts
     cmds:
       - cargo clean
+      - rm -rf {{.TASK_CACHE_DIR}}
 
   format:
     desc: Verify Rust formatting
