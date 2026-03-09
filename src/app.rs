@@ -3,6 +3,7 @@ use std::process::ExitCode;
 use crate::cli::{Cli, Command};
 use crate::config::{Config, ConfigError};
 use crate::dispatch::{DispatchError, dispatch};
+use crate::logging::{Level, Logger, new_dispatch_id};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RunOutcome {
@@ -11,25 +12,84 @@ pub enum RunOutcome {
 }
 
 pub fn run(cli: Cli) -> Result<RunOutcome, AppError> {
+    let logger = Logger::init_from_env();
+    let dispatch_id = new_dispatch_id();
+
     match cli.command {
         Some(Command::Check { path }) => {
+            logger.log(
+                Level::Info,
+                "startup",
+                &dispatch_id,
+                vec![
+                    ("mode", "check".to_string()),
+                    ("config_path", path.display().to_string()),
+                ],
+            );
             Config::check_path(&path)?;
             check_config();
             Ok(RunOutcome::ExitCode(ExitCode::SUCCESS))
         }
         None => {
+            let config_hint = cli
+                .config
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "<default>".to_string());
+            logger.log(
+                Level::Info,
+                "startup",
+                &dispatch_id,
+                vec![
+                    ("mode", "dispatch".to_string()),
+                    ("config_path_hint", config_hint),
+                ],
+            );
+
             let path = match cli.config {
                 Some(path) => path,
-                None => Config::default_path()?,
+                None => match Config::default_path() {
+                    Ok(path) => path,
+                    Err(error) => {
+                        logger.log(
+                            Level::Error,
+                            "config_path_resolution_failed",
+                            &dispatch_id,
+                            vec![("error", error.to_string())],
+                        );
+                        return Err(AppError::Internal);
+                    }
+                },
             };
-            let config = Config::load_from_path(&path)?;
-            run_config(&config)
+            logger.log(
+                Level::Info,
+                "config_path_resolved",
+                &dispatch_id,
+                vec![("config_path", path.display().to_string())],
+            );
+
+            let config = match Config::load_from_path(&path) {
+                Ok(config) => config,
+                Err(error) => {
+                    logger.log(
+                        Level::Error,
+                        "config_load_failed",
+                        &dispatch_id,
+                        vec![
+                            ("config_path", path.display().to_string()),
+                            ("error", error.to_string()),
+                        ],
+                    );
+                    return Err(AppError::Internal);
+                }
+            };
+            run_config(&config, &logger, &dispatch_id)
         }
     }
 }
 
-fn run_config(config: &Config) -> Result<RunOutcome, AppError> {
-    let status = dispatch(config)?;
+fn run_config(config: &Config, logger: &Logger, dispatch_id: &str) -> Result<RunOutcome, AppError> {
+    let status = dispatch(config, logger, dispatch_id)?;
     Ok(outcome_from_status(status))
 }
 
@@ -48,6 +108,7 @@ fn outcome_from_status(status: std::process::ExitStatus) -> RunOutcome {
 pub enum AppError {
     Config(ConfigError),
     Dispatch(DispatchError),
+    Internal,
 }
 
 impl std::fmt::Display for AppError {
@@ -55,6 +116,7 @@ impl std::fmt::Display for AppError {
         match self {
             AppError::Config(error) => error.fmt(f),
             AppError::Dispatch(error) => error.fmt(f),
+            AppError::Internal => write!(f, "internal error"),
         }
     }
 }
@@ -64,6 +126,7 @@ impl std::error::Error for AppError {
         match self {
             AppError::Config(error) => Some(error),
             AppError::Dispatch(error) => Some(error),
+            AppError::Internal => None,
         }
     }
 }

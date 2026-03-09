@@ -121,6 +121,73 @@ commands:
     assert!(String::from_utf8_lossy(&output.stderr).is_empty());
 }
 
+#[test]
+fn dispatch_hides_config_parse_errors_from_ssh_caller() {
+    let temp = TestDir::new();
+    let config = temp.write_config(
+        "invalid.yaml",
+        r#"
+commands:
+  broken
+    run: nope
+"#,
+    );
+
+    let output = hatch_command()
+        .arg("--config")
+        .arg(&config)
+        .env("SSH_ORIGINAL_COMMAND", "lock-screen")
+        .output()
+        .expect("dispatch command should run");
+
+    assert!(!output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr).trim(),
+        "internal error"
+    );
+}
+
+#[test]
+fn dispatch_logs_share_single_dispatch_id() {
+    let temp = TestDir::new();
+    let config = temp.write_config(
+        "dispatch.yaml",
+        r#"
+commands:
+  ok:
+    run: exit 0
+"#,
+    );
+    let log_path = temp.path().join("hatch.log");
+
+    let output = hatch_command()
+        .arg("--config")
+        .arg(&config)
+        .env("SSH_ORIGINAL_COMMAND", "ok")
+        .env("HATCH_LOG_SINK", "file")
+        .env("HATCH_LOG_FILE", &log_path)
+        .output()
+        .expect("dispatch command should run");
+
+    assert!(output.status.success());
+
+    let logs = fs::read_to_string(&log_path).expect("log file should exist");
+    let mut ids = Vec::new();
+    for line in logs.lines() {
+        let Some(fragment) = line
+            .split_whitespace()
+            .find(|part| part.starts_with("dispatch_id="))
+        else {
+            continue;
+        };
+        let id = fragment.trim_start_matches("dispatch_id=");
+        ids.push(id.to_string());
+    }
+
+    assert!(ids.len() >= 3, "expected multiple logged events");
+    assert!(ids.iter().all(|id| id == &ids[0]));
+}
+
 fn hatch_command() -> Command {
     Command::new(env!("CARGO_BIN_EXE_hatch"))
 }

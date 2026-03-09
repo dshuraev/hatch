@@ -54,6 +54,28 @@ The incoming SSH command is treated as untrusted input. The configuration file i
 On Unix-like systems, commands are currently executed using `/bin/sh -c`.
 When the child process exits normally, `hatch` exits with that same status code. If the process has no exit code (for example, terminated by signal), `hatch` exits with failure.
 
+## Logging
+
+Operational logs are emitted only to internal sinks, never to SSH client output.
+
+Configure sink with environment variables:
+
+```txt
+HATCH_LOG_SINK=journald   # journald | file | off
+HATCH_LOG_FILE=/var/log/hatch/hatch.log   # required when HATCH_LOG_SINK=file
+```
+
+Each request gets a random `dispatch_id` shared by startup, config, and dispatch events.
+`hatch` logs startup immediately and includes the config path (or `<default>` hint followed by the resolved path event).
+
+When config loading/parsing fails in dispatch mode, the SSH client receives only:
+
+```txt
+internal error
+```
+
+Detailed diagnostics are written only to the internal log sink.
+
 ## Configuration
 
 Configuration is defined in YAML:

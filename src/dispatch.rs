@@ -4,41 +4,116 @@ use std::fmt;
 use std::process::{Command, ExitStatus};
 
 use crate::config::Config;
+use crate::logging::{Level, Logger};
 
-pub fn dispatch(config: &Config) -> Result<ExitStatus, DispatchError> {
+pub fn dispatch(
+    config: &Config,
+    logger: &Logger,
+    dispatch_id: &str,
+) -> Result<ExitStatus, DispatchError> {
     dispatch_with(
         config,
         env::var("SSH_ORIGINAL_COMMAND").ok(),
         execute_shell_command,
+        |level, event, fields| logger.log(level, event, dispatch_id, fields),
     )
 }
 
-fn dispatch_with<F>(
+fn dispatch_with<F, L>(
     config: &Config,
     original_command: Option<String>,
     executor: F,
+    mut log: L,
 ) -> Result<ExitStatus, DispatchError>
 where
     F: FnOnce(&str) -> Result<ExitStatus, std::io::Error>,
+    L: FnMut(Level, &str, Vec<(&'static str, String)>),
 {
+    log(Level::Info, "dispatch_start", vec![]);
+
     let original_command = original_command
-        .ok_or(DispatchError::MissingOriginalCommand)?
+        .ok_or_else(|| {
+            log(
+                Level::Error,
+                "dispatch_error",
+                vec![("error_kind", "missing_original_command".to_string())],
+            );
+            DispatchError::MissingOriginalCommand
+        })?
         .trim()
         .to_string();
 
     if original_command.is_empty() {
+        log(
+            Level::Error,
+            "dispatch_error",
+            vec![("error_kind", "missing_original_command".to_string())],
+        );
         return Err(DispatchError::MissingOriginalCommand);
     }
 
-    let command = config
-        .commands
-        .get(&original_command)
-        .ok_or_else(|| DispatchError::UnknownCommand(original_command.clone()))?;
+    log(
+        Level::Info,
+        "dispatch_match_attempt",
+        vec![("ssh_original_command", original_command.clone())],
+    );
 
-    executor(&command.run).map_err(|source| DispatchError::Execute {
-        command: original_command,
-        source,
-    })
+    let command = config.commands.get(&original_command).ok_or_else(|| {
+        log(
+            Level::Error,
+            "dispatch_error",
+            vec![
+                ("error_kind", "unknown_command".to_string()),
+                ("ssh_original_command", original_command.clone()),
+            ],
+        );
+        DispatchError::UnknownCommand(original_command.clone())
+    })?;
+
+    log(
+        Level::Info,
+        "dispatch_match",
+        vec![("ssh_original_command", original_command.clone())],
+    );
+
+    log(
+        Level::Info,
+        "dispatch_exec",
+        vec![
+            ("ssh_original_command", original_command.clone()),
+            ("run", command.run.clone()),
+        ],
+    );
+
+    match executor(&command.run) {
+        Ok(status) => {
+            log(
+                Level::Info,
+                "dispatch_result",
+                vec![
+                    ("ssh_original_command", original_command),
+                    ("exit_code", status.code().unwrap_or(-1).to_string()),
+                    ("success", status.success().to_string()),
+                ],
+            );
+            Ok(status)
+        }
+        Err(source) => {
+            log(
+                Level::Error,
+                "dispatch_error",
+                vec![
+                    ("error_kind", "execute_failed".to_string()),
+                    ("ssh_original_command", original_command.clone()),
+                    ("io_error", source.to_string()),
+                ],
+            );
+            Err(DispatchError::Execute {
+                command: original_command,
+                source,
+            })
+        }
+    }
 }
 
 fn execute_shell_command(command: &str) -> Result<ExitStatus, std::io::Error> {
@@ -119,7 +194,7 @@ mod tests {
 
     #[test]
     fn rejects_missing_ssh_original_command() {
-        let error = dispatch_with(&sample_config(), None, |_| unreachable!())
+        let error = dispatch_with(&sample_config(), None, |_| unreachable!(), |_, _, _| {})
             .expect_err("dispatch should fail");
 
         assert!(matches!(error, DispatchError::MissingOriginalCommand));
@@ -131,6 +206,7 @@ mod tests {
             &sample_config(),
             Some("restart-app".to_string()),
             |_| unreachable!(),
+            |_, _, _| {},
         )
         .expect_err("dispatch should fail");
 
@@ -145,6 +221,7 @@ mod tests {
             &sample_config(),
             Some("   ".to_string()),
             |_| unreachable!(),
+            |_, _, _| {},
         )
         .expect_err("dispatch should fail");
 
@@ -153,12 +230,17 @@ mod tests {
 
     #[test]
     fn surfaces_executor_failures() {
-        let error = dispatch_with(&sample_config(), Some("lock-screen".to_string()), |_| {
-            Err(io::Error::new(
-                io::ErrorKind::PermissionDenied,
-                "permission denied",
-            ))
-        })
+        let error = dispatch_with(
+            &sample_config(),
+            Some("lock-screen".to_string()),
+            |_| {
+                Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "permission denied",
+                ))
+            },
+            |_, _, _| {},
+        )
         .expect_err("dispatch should fail");
 
         assert!(matches!(
@@ -178,6 +260,7 @@ mod tests {
                 assert_eq!(command, "loginctl lock-session");
                 Ok(success_status())
             },
+            |_, _, _| {},
         )
         .expect("dispatch should succeed");
 
