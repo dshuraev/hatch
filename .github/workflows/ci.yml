@@ -23,4 +23,7 @@ jobs:
         run: rustup component add --toolchain 1.89.0-x86_64-unknown-linux-gnu rustfmt clippy
 
       - name: Run fast verification gate
+        env:
+          CARGO_HOME: .task-cache/cargo-home
+          CARGO_DENY_HOME: .task-cache/cargo-deny
         run: mise exec -- task ci

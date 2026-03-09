@@ -3,6 +3,9 @@ version: "3"
 vars:
   REPORTS_DIR: reports
   RELEASE_DIR: dist
+  TASK_CACHE_DIR: .task-cache
+  DENY_CARGO_HOME: "{{.TASK_CACHE_DIR}}/cargo-home"
+  DENY_CARGO_DENY_HOME: "{{.TASK_CACHE_DIR}}/cargo-deny"
   FUZZ_TARGETS:
     - "config_check_reader"
 
@@ -51,7 +54,8 @@ tasks:
   deny:
     desc: Run cargo-deny checks
     cmds:
-      - cargo deny check
+      - mkdir -p {{.DENY_CARGO_HOME}} {{.DENY_CARGO_DENY_HOME}}
+      - CARGO_HOME={{.DENY_CARGO_HOME}} CARGO_DENY_HOME={{.DENY_CARGO_DENY_HOME}} cargo deny check
 
   coverage:
     desc: Generate coverage reports

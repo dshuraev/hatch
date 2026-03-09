@@ -106,6 +106,8 @@ Heavyweight analysis stays outside the default PR gate because it is slower and 
 * unknown registry and git source rejection
 * approved license policy
 
+The `deny` task runs with repo-local `CARGO_HOME` and `CARGO_DENY_HOME` under `.task-cache/` so advisory DB locks and cache writes stay hermetic across local shells, containers, and CI.
+
 `cargo-audit` remains part of the release verification path for an additional advisory check.
 
 `cargo-auditable` is required for release artifacts so distributed binaries retain dependency metadata for downstream scanning.
