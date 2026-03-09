@@ -46,10 +46,29 @@ log_level: info
         config.extra.get("log_level"),
         Some(&Value::String("info".to_string()))
     );
-    assert_eq!(
-        config.commands["lock-screen"].extra.get("timeout"),
-        Some(&Value::Number(30.into()))
-    );
+    assert_eq!(config.commands["lock-screen"].timeout, Some(30));
+}
+
+#[test]
+fn deserializes_execution_controls() {
+    let yaml = r#"
+commands:
+  restart-app:
+    run: systemctl restart app
+    timeout: 15
+    cwd: /opt/app
+    env:
+      APP_ENV: production
+      LOG_LEVEL: warn
+"#;
+
+    let config: Config = serde_yaml::from_str(yaml).expect("config should deserialize");
+    let command = &config.commands["restart-app"];
+
+    assert_eq!(command.timeout, Some(15));
+    assert_eq!(command.cwd, Some(PathBuf::from("/opt/app")));
+    assert_eq!(command.env.get("APP_ENV"), Some(&"production".to_string()));
+    assert_eq!(command.env.get("LOG_LEVEL"), Some(&"warn".to_string()));
 }
 
 #[test]
@@ -76,6 +95,57 @@ commands:
     assert!(rendered.contains("missing-run"));
     assert!(rendered.contains("run: \"  \""));
     assert!(rendered.contains("missing-run: {}"));
+}
+
+#[test]
+fn rejects_non_positive_timeout() {
+    let error = check_config(
+        "non-positive-timeout.yaml",
+        r#"
+commands:
+  lock-screen:
+    run: loginctl lock-session
+    timeout: 0
+"#,
+    )
+    .expect_err("config should be invalid");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("field `timeout` must be greater than 0"));
+}
+
+#[test]
+fn rejects_relative_cwd() {
+    let error = check_config(
+        "relative-cwd.yaml",
+        r#"
+commands:
+  lock-screen:
+    run: loginctl lock-session
+    cwd: ./relative/path
+"#,
+    )
+    .expect_err("config should be invalid");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("field `cwd` must be an absolute path"));
+}
+
+#[test]
+fn rejects_non_mapping_env() {
+    let error = check_config(
+        "env-not-mapping.yaml",
+        r#"
+commands:
+  lock-screen:
+    run: loginctl lock-session
+    env: []
+"#,
+    )
+    .expect_err("config should be invalid");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("field `env` must be a mapping"));
 }
 
 #[test]

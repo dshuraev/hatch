@@ -188,8 +188,96 @@ commands:
     assert!(ids.iter().all(|id| id == &ids[0]));
 }
 
+#[test]
+#[cfg(unix)]
+fn dispatch_applies_absolute_cwd() {
+    let temp = TestDir::new();
+    let work_dir = temp.create_dir("work");
+    let quoted = shell_single_quote(&work_dir.display().to_string());
+    let config = temp.write_config(
+        "dispatch.yaml",
+        &format!(
+            r#"
+commands:
+  check-cwd:
+    run: if [ "$PWD" = {quoted} ]; then exit 0; else exit 23; fi
+    cwd: {}
+"#,
+            work_dir.display()
+        ),
+    );
+
+    let output = hatch_command()
+        .arg("--config")
+        .arg(&config)
+        .env("SSH_ORIGINAL_COMMAND", "check-cwd")
+        .output()
+        .expect("dispatch command should run");
+
+    assert_eq!(output.status.code(), Some(0));
+}
+
+#[test]
+#[cfg(unix)]
+fn dispatch_overlays_env_onto_inherited_environment() {
+    let temp = TestDir::new();
+    let config = temp.write_config(
+        "dispatch.yaml",
+        r#"
+commands:
+  check-env:
+    run: if [ "$PARENT_ONLY" = "yes" ] && [ "$OVERRIDE_ME" = "from-config" ] && [ "$NEW_ONLY" = "new" ]; then exit 0; else exit 19; fi
+    env:
+      OVERRIDE_ME: from-config
+      NEW_ONLY: new
+"#,
+    );
+
+    let output = hatch_command()
+        .arg("--config")
+        .arg(&config)
+        .env("SSH_ORIGINAL_COMMAND", "check-env")
+        .env("PARENT_ONLY", "yes")
+        .env("OVERRIDE_ME", "from-parent")
+        .output()
+        .expect("dispatch command should run");
+
+    assert_eq!(output.status.code(), Some(0));
+}
+
+#[test]
+#[cfg(unix)]
+fn dispatch_hard_kills_process_on_timeout() {
+    let temp = TestDir::new();
+    let config = temp.write_config(
+        "dispatch.yaml",
+        r#"
+commands:
+  slow:
+    run: sleep 2
+    timeout: 1
+"#,
+    );
+
+    let output = hatch_command()
+        .arg("--config")
+        .arg(&config)
+        .env("SSH_ORIGINAL_COMMAND", "slow")
+        .output()
+        .expect("dispatch command should run");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("exceeded timeout"));
+}
+
 fn hatch_command() -> Command {
     Command::new(env!("CARGO_BIN_EXE_hatch"))
+}
+
+#[cfg(unix)]
+fn shell_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
 struct TestDir {

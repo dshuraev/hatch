@@ -19,6 +19,10 @@ pub struct Config {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommandConfig {
     pub run: String,
+    pub timeout: Option<u64>,
+    pub cwd: Option<PathBuf>,
+    #[serde(default)]
+    pub env: BTreeMap<String, String>,
     #[serde(flatten, default)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -350,6 +354,72 @@ fn validate_command_entry(
             message: format!("command `{command_name}` field `run` must be a string"),
             location: locate_key(source, &["commands", command_name, "run"]),
         }),
+    }
+
+    if let Some(timeout_value) = mapping_get(command_mapping, "timeout") {
+        match timeout_value.as_u64() {
+            Some(timeout) if timeout > 0 => {}
+            Some(_) => diagnostics.push(ConfigDiagnostic {
+                message: format!("command `{command_name}` field `timeout` must be greater than 0"),
+                location: locate_key(source, &["commands", command_name, "timeout"]),
+            }),
+            None => diagnostics.push(ConfigDiagnostic {
+                message: format!(
+                    "command `{command_name}` field `timeout` must be a positive integer"
+                ),
+                location: locate_key(source, &["commands", command_name, "timeout"]),
+            }),
+        }
+    }
+
+    if let Some(cwd_value) = mapping_get(command_mapping, "cwd") {
+        match cwd_value.as_str() {
+            Some(cwd) if Path::new(cwd).is_absolute() => {}
+            Some(_) => diagnostics.push(ConfigDiagnostic {
+                message: format!("command `{command_name}` field `cwd` must be an absolute path"),
+                location: locate_key(source, &["commands", command_name, "cwd"]),
+            }),
+            None => diagnostics.push(ConfigDiagnostic {
+                message: format!("command `{command_name}` field `cwd` must be a string"),
+                location: locate_key(source, &["commands", command_name, "cwd"]),
+            }),
+        }
+    }
+
+    if let Some(env_value) = mapping_get(command_mapping, "env") {
+        let Some(env_mapping) = env_value.as_mapping() else {
+            diagnostics.push(ConfigDiagnostic {
+                message: format!("command `{command_name}` field `env` must be a mapping"),
+                location: locate_key(source, &["commands", command_name, "env"]),
+            });
+            return;
+        };
+
+        for (env_key, env_value) in env_mapping {
+            let Some(key) = env_key.as_str() else {
+                diagnostics.push(ConfigDiagnostic {
+                    message: format!("command `{command_name}` field `env` must use string keys"),
+                    location: locate_key(source, &["commands", command_name, "env"]),
+                });
+                continue;
+            };
+
+            if key.trim().is_empty() {
+                diagnostics.push(ConfigDiagnostic {
+                    message: format!(
+                        "command `{command_name}` field `env` must not contain blank keys"
+                    ),
+                    location: locate_key(source, &["commands", command_name, "env"]),
+                });
+            }
+
+            if !env_value.is_string() {
+                diagnostics.push(ConfigDiagnostic {
+                    message: format!("command `{command_name}` field `env.{key}` must be a string"),
+                    location: locate_key(source, &["commands", command_name, "env"]),
+                });
+            }
+        }
     }
 }
 

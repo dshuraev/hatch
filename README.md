@@ -87,9 +87,19 @@ commands:
 
   restart-app:
     run: systemctl restart app
+    timeout: 30
+    cwd: /opt/app
+    env:
+      APP_ENV: production
+      LOG_LEVEL: warn
 ```
 
 Only commands defined under `commands` are executable. Any unmatched request is rejected.
+Per-command execution controls are optional:
+
+* `timeout`: positive integer seconds. When exceeded, `hatch` hard-kills the child process.
+* `cwd`: absolute path only.
+* `env`: mapping of string keys and string values, overlaid on top of the inherited process environment.
 
 By default, configuration is loaded from:
 

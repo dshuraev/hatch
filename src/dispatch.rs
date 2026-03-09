@@ -2,8 +2,10 @@ use std::env;
 use std::error::Error;
 use std::fmt;
 use std::process::{Command, ExitStatus};
+use std::thread;
+use std::time::{Duration, Instant};
 
-use crate::config::Config;
+use crate::config::{CommandConfig, Config};
 use crate::logging::{Level, Logger};
 
 pub fn dispatch(
@@ -26,7 +28,7 @@ fn dispatch_with<F, L>(
     mut log: L,
 ) -> Result<ExitStatus, DispatchError>
 where
-    F: FnOnce(&str) -> Result<ExitStatus, std::io::Error>,
+    F: FnOnce(&CommandConfig) -> Result<ExitStatus, ExecuteError>,
     L: FnMut(Level, &str, Vec<(&'static str, String)>),
 {
     log(Level::Info, "dispatch_start", vec![]);
@@ -79,13 +81,10 @@ where
     log(
         Level::Info,
         "dispatch_exec",
-        vec![
-            ("ssh_original_command", original_command.clone()),
-            ("run", command.run.clone()),
-        ],
+        dispatch_fields(&original_command, command),
     );
 
-    match executor(&command.run) {
+    match executor(command) {
         Ok(status) => {
             log(
                 Level::Info,
@@ -98,7 +97,7 @@ where
             );
             Ok(status)
         }
-        Err(source) => {
+        Err(ExecuteError::Io(source)) => {
             log(
                 Level::Error,
                 "dispatch_error",
@@ -113,31 +112,121 @@ where
                 source,
             })
         }
+        Err(ExecuteError::Timeout { timeout_secs }) => {
+            log(
+                Level::Error,
+                "dispatch_error",
+                vec![
+                    ("error_kind", "execute_timeout".to_string()),
+                    ("ssh_original_command", original_command.clone()),
+                    ("timeout_secs", timeout_secs.to_string()),
+                ],
+            );
+            Err(DispatchError::Timeout {
+                command: original_command,
+                timeout_secs,
+            })
+        }
     }
 }
 
-fn execute_shell_command(command: &str) -> Result<ExitStatus, std::io::Error> {
-    shell_command(command).status()
+fn dispatch_fields(original_command: &str, command: &CommandConfig) -> Vec<(&'static str, String)> {
+    let mut fields = vec![
+        ("ssh_original_command", original_command.to_string()),
+        ("run", command.run.clone()),
+    ];
+
+    if let Some(timeout) = command.timeout {
+        fields.push(("timeout_secs", timeout.to_string()));
+    }
+
+    if let Some(cwd) = &command.cwd {
+        fields.push(("cwd", cwd.display().to_string()));
+    }
+
+    if !command.env.is_empty() {
+        fields.push(("env_keys", command.env.len().to_string()));
+    }
+
+    fields
+}
+
+fn execute_shell_command(command: &CommandConfig) -> Result<ExitStatus, ExecuteError> {
+    let mut process = shell_command(command);
+    let mut child = process.spawn().map_err(ExecuteError::Io)?;
+
+    match command.timeout {
+        Some(timeout_secs) => wait_with_timeout(&mut child, timeout_secs),
+        None => child.wait().map_err(ExecuteError::Io),
+    }
+}
+
+fn wait_with_timeout(
+    child: &mut std::process::Child,
+    timeout_secs: u64,
+) -> Result<ExitStatus, ExecuteError> {
+    let timeout = Duration::from_secs(timeout_secs);
+    let start = Instant::now();
+
+    loop {
+        if let Some(status) = child.try_wait().map_err(ExecuteError::Io)? {
+            return Ok(status);
+        }
+
+        if start.elapsed() >= timeout {
+            match child.kill() {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => {}
+                Err(error) => return Err(ExecuteError::Io(error)),
+            }
+            let _ = child.wait();
+            return Err(ExecuteError::Timeout { timeout_secs });
+        }
+
+        thread::sleep(Duration::from_millis(10));
+    }
 }
 
 #[cfg(unix)]
-fn shell_command(command: &str) -> Command {
+fn shell_command(command: &CommandConfig) -> Command {
     let mut process = Command::new("/bin/sh");
-    process.arg("-c").arg(command);
+    process.arg("-c").arg(&command.run);
+    if let Some(cwd) = &command.cwd {
+        process.current_dir(cwd);
+    }
+    if !command.env.is_empty() {
+        process.envs(&command.env);
+    }
     process
 }
 
 #[cfg(windows)]
-fn shell_command(command: &str) -> Command {
+fn shell_command(command: &CommandConfig) -> Command {
     let mut process = Command::new("cmd.exe");
-    process.arg("/C").arg(command);
+    process.arg("/C").arg(&command.run);
+    if let Some(cwd) = &command.cwd {
+        process.current_dir(cwd);
+    }
+    if !command.env.is_empty() {
+        process.envs(&command.env);
+    }
     process
+}
+
+#[derive(Debug)]
+enum ExecuteError {
+    Io(std::io::Error),
+    Timeout { timeout_secs: u64 },
 }
 
 #[derive(Debug)]
 pub enum DispatchError {
     MissingOriginalCommand,
     UnknownCommand(String),
+    Timeout {
+        command: String,
+        timeout_secs: u64,
+    },
     Execute {
         command: String,
         source: std::io::Error,
@@ -156,6 +245,15 @@ impl fmt::Display for DispatchError {
             DispatchError::UnknownCommand(command) => {
                 write!(f, "command `{command}` is not defined in config")
             }
+            DispatchError::Timeout {
+                command,
+                timeout_secs,
+            } => {
+                write!(
+                    f,
+                    "command `{command}` exceeded timeout after {timeout_secs}s and was killed"
+                )
+            }
             DispatchError::Execute { command, source } => {
                 write!(f, "failed to execute command `{command}`: {source}")
             }
@@ -167,7 +265,9 @@ impl Error for DispatchError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             DispatchError::Execute { source, .. } => Some(source),
-            DispatchError::MissingOriginalCommand | DispatchError::UnknownCommand(_) => None,
+            DispatchError::MissingOriginalCommand
+            | DispatchError::UnknownCommand(_)
+            | DispatchError::Timeout { .. } => None,
         }
     }
 }
@@ -177,7 +277,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::io;
 
-    use super::{DispatchError, dispatch_with};
+    use super::{DispatchError, ExecuteError, dispatch_with};
     use crate::config::{CommandConfig, Config};
 
     #[cfg(unix)]
@@ -234,10 +334,10 @@ mod tests {
             &sample_config(),
             Some("lock-screen".to_string()),
             |_| {
-                Err(io::Error::new(
+                Err(ExecuteError::Io(io::Error::new(
                     io::ErrorKind::PermissionDenied,
                     "permission denied",
-                ))
+                )))
             },
             |_, _, _| {},
         )
@@ -252,12 +352,31 @@ mod tests {
     }
 
     #[test]
+    fn surfaces_executor_timeouts() {
+        let error = dispatch_with(
+            &sample_config(),
+            Some("lock-screen".to_string()),
+            |_| Err(ExecuteError::Timeout { timeout_secs: 3 }),
+            |_, _, _| {},
+        )
+        .expect_err("dispatch should fail");
+
+        assert!(matches!(
+            error,
+            DispatchError::Timeout {
+                command,
+                timeout_secs
+            } if command == "lock-screen" && timeout_secs == 3
+        ));
+    }
+
+    #[test]
     fn executes_matched_command() {
         let status = dispatch_with(
             &sample_config(),
             Some("lock-screen".to_string()),
             |command| {
-                assert_eq!(command, "loginctl lock-session");
+                assert_eq!(command.run, "loginctl lock-session");
                 Ok(success_status())
             },
             |_, _, _| {},
