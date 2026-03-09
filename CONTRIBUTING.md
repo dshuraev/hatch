@@ -34,7 +34,7 @@ Optional tools for heavyweight verification:
 * `cargo-fuzz`
 * `cargo-coupling`
 
-The `task miri` target automatically installs the `miri` component for the pinned nightly toolchain if it is missing.
+Task targets install required Rust components via `rustup component add` with pinned `RUSTUP_TOOLCHAIN` values, so checks do not rely on `mise` component provisioning.
 
 ## Development Workflow
 
