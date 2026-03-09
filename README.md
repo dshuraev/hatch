@@ -52,6 +52,7 @@ SSH exposes `lock-screen` via the `SSH_ORIGINAL_COMMAND` environment variable.
 The incoming SSH command is treated as untrusted input. The configuration file is trusted owner-controlled data.
 
 On Unix-like systems, commands are currently executed using `/bin/sh -c`.
+When the child process exits normally, `hatch` exits with that same status code. If the process has no exit code (for example, terminated by signal), `hatch` exits with failure.
 
 ## Configuration
 

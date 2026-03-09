@@ -4,12 +4,18 @@ use crate::cli::{Cli, Command};
 use crate::config::{Config, ConfigError};
 use crate::dispatch::{DispatchError, dispatch};
 
-pub fn run(cli: Cli) -> Result<ExitCode, AppError> {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RunOutcome {
+    ExitCode(ExitCode),
+    ProcessExit(i32),
+}
+
+pub fn run(cli: Cli) -> Result<RunOutcome, AppError> {
     match cli.command {
         Some(Command::Check { path }) => {
             Config::check_path(&path)?;
             check_config();
-            Ok(ExitCode::SUCCESS)
+            Ok(RunOutcome::ExitCode(ExitCode::SUCCESS))
         }
         None => {
             let path = match cli.config {
@@ -22,19 +28,19 @@ pub fn run(cli: Cli) -> Result<ExitCode, AppError> {
     }
 }
 
-fn run_config(config: &Config) -> Result<ExitCode, AppError> {
+fn run_config(config: &Config) -> Result<RunOutcome, AppError> {
     let status = dispatch(config)?;
-    Ok(exit_code_from_status(status))
+    Ok(outcome_from_status(status))
 }
 
 fn check_config() {
     println!("config is valid");
 }
 
-fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
+fn outcome_from_status(status: std::process::ExitStatus) -> RunOutcome {
     match status.code() {
-        Some(code) => ExitCode::from(code as u8),
-        None => ExitCode::FAILURE,
+        Some(code) => RunOutcome::ProcessExit(code),
+        None => RunOutcome::ExitCode(ExitCode::FAILURE),
     }
 }
 
@@ -76,17 +82,38 @@ impl From<DispatchError> for AppError {
 
 #[cfg(test)]
 mod tests {
-    use super::exit_code_from_status;
+    use super::{RunOutcome, outcome_from_status};
     use std::process::ExitCode;
 
     #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
+    #[cfg(windows)]
+    use std::os::windows::process::ExitStatusExt;
+
+    #[test]
+    #[cfg(unix)]
+    fn returns_process_exit_code_when_available() {
+        let status = std::process::ExitStatus::from_raw(7 << 8);
+
+        assert_eq!(outcome_from_status(status), RunOutcome::ProcessExit(7));
+    }
 
     #[test]
     #[cfg(unix)]
     fn returns_failure_when_process_has_no_exit_code() {
         let status = std::process::ExitStatus::from_raw(9);
 
-        assert_eq!(exit_code_from_status(status), ExitCode::FAILURE);
+        assert_eq!(
+            outcome_from_status(status),
+            RunOutcome::ExitCode(ExitCode::FAILURE)
+        );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn preserves_large_windows_exit_codes() {
+        let status = std::process::ExitStatus::from_raw(259);
+
+        assert_eq!(outcome_from_status(status), RunOutcome::ProcessExit(259));
     }
 }
