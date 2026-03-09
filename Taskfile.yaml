@@ -70,6 +70,7 @@ tasks:
   miri:
     desc: Check for UB
     cmds:
+      - RUSTUP_TOOLCHAIN=nightly-2025-10-31 rustup component add miri rust-src
       - cargo +nightly-2025-10-31 miri test
 
   fuzz:all:

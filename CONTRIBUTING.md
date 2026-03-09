@@ -34,6 +34,8 @@ Optional tools for heavyweight verification:
 * `cargo-fuzz`
 * `cargo-coupling`
 
+The `task miri` target automatically installs the `miri` component for the pinned nightly toolchain if it is missing.
+
 ## Development Workflow
 
 1. Make the smallest testable change.
