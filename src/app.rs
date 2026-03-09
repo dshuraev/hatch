@@ -3,7 +3,7 @@ use std::process::ExitCode;
 use crate::cli::{Cli, Command};
 use crate::config::{Config, ConfigError};
 use crate::dispatch::{DispatchError, dispatch};
-use crate::logging::{Level, Logger, new_dispatch_id};
+use crate::logging::{AppMode, Level, Logger, new_dispatch_id};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RunOutcome {
@@ -12,7 +12,12 @@ pub enum RunOutcome {
 }
 
 pub fn run(cli: Cli) -> Result<RunOutcome, AppError> {
-    let logger = Logger::init_from_env();
+    let mode = match &cli.command {
+        Some(Command::Check { .. }) => AppMode::Check,
+        Some(Command::List) => AppMode::List,
+        None => AppMode::Dispatch,
+    };
+    let logger = Logger::init_for_mode(mode);
     let dispatch_id = new_dispatch_id();
 
     match cli.command {

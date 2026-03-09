@@ -11,8 +11,16 @@ pub enum Level {
     Error,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppMode {
+    Dispatch,
+    Check,
+    List,
+}
+
 enum Sink {
     Off,
+    Stdout,
     File(Mutex<std::fs::File>),
     Journald(JournaldSink),
 }
@@ -22,13 +30,18 @@ pub struct Logger {
 }
 
 impl Logger {
-    pub fn init_from_env() -> Self {
-        let sink = env::var("HATCH_LOG_SINK")
-            .unwrap_or_else(|_| "journald".to_string())
-            .to_ascii_lowercase();
+    pub fn init_for_mode(mode: AppMode) -> Self {
+        let sink = match env::var("HATCH_LOG_SINK") {
+            Ok(value) => value.to_ascii_lowercase(),
+            Err(_) => match mode {
+                AppMode::Dispatch => "journald".to_string(),
+                AppMode::Check | AppMode::List => "stdout".to_string(),
+            },
+        };
 
         match sink.as_str() {
             "off" => Self::off(),
+            "stdout" => Self { sink: Sink::Stdout },
             "file" => {
                 let Some(path) = env::var_os("HATCH_LOG_FILE") else {
                     return Self::off();
@@ -83,6 +96,10 @@ impl Logger {
                 if let Ok(mut file) = file.lock() {
                     let _ = writeln!(file, "{line}");
                 }
+            }
+            Sink::Stdout => {
+                let mut stdout = std::io::stdout().lock();
+                let _ = writeln!(stdout, "{line}");
             }
             Sink::Journald(journald) => {
                 let _ = journald.send(priority_for_level(&level), event, dispatch_id, &line);

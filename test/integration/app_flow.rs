@@ -26,7 +26,9 @@ commands:
         .expect("check command should run");
 
     assert!(output.status.success());
-    assert_eq!(String::from_utf8_lossy(&output.stdout), "config is valid\n");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("config is valid"));
+    assert!(stdout.contains("event=startup"));
     assert!(String::from_utf8_lossy(&output.stderr).is_empty());
 }
 
@@ -94,10 +96,10 @@ commands:
         .expect("list command should run");
 
     assert!(output.status.success());
-    assert_eq!(
-        String::from_utf8_lossy(&output.stdout),
-        "lock-screen\nrestart-app\n"
-    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("event=startup"));
+    let command_lines: Vec<_> = stdout.lines().filter(|line| !line.contains('=')).collect();
+    assert_eq!(command_lines, vec!["lock-screen", "restart-app"]);
     assert!(String::from_utf8_lossy(&output.stderr).is_empty());
 }
 
@@ -124,7 +126,10 @@ commands:
         .expect("list command should run");
 
     assert!(output.status.success());
-    assert_eq!(String::from_utf8_lossy(&output.stdout), "ping\n");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("event=startup"));
+    let command_lines: Vec<_> = stdout.lines().filter(|line| !line.contains('=')).collect();
+    assert_eq!(command_lines, vec!["ping"]);
     assert!(String::from_utf8_lossy(&output.stderr).is_empty());
 }
 
@@ -242,6 +247,32 @@ commands:
 
     assert!(ids.len() >= 3, "expected multiple logged events");
     assert!(ids.iter().all(|id| id == &ids[0]));
+}
+
+#[test]
+fn dispatch_logs_to_stdout_when_explicitly_enabled() {
+    let temp = TestDir::new();
+    let config = temp.write_config(
+        "dispatch.yaml",
+        r#"
+commands:
+  ok:
+    run: exit 0
+"#,
+    );
+
+    let output = hatch_command()
+        .arg("--config")
+        .arg(&config)
+        .env("SSH_ORIGINAL_COMMAND", "ok")
+        .env("HATCH_LOG_SINK", "stdout")
+        .output()
+        .expect("dispatch command should run");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("event=startup"));
+    assert!(stdout.contains("event=dispatch_start"));
 }
 
 #[test]

@@ -61,9 +61,16 @@ Operational logs are emitted only to internal sinks, never to SSH client output.
 Configure sink with environment variables:
 
 ```txt
-HATCH_LOG_SINK=journald   # journald | file | off
+HATCH_LOG_SINK=journald   # journald | file | stdout | off
 HATCH_LOG_FILE=/var/log/hatch/hatch.log   # required when HATCH_LOG_SINK=file
 ```
+
+Default sink behavior:
+
+* `dispatch` mode: `journald`
+* `check` and `list` modes: `stdout`
+
+Use `HATCH_LOG_SINK=stdout` to explicitly enable stdout logging in any mode.
 
 Each request gets a random `dispatch_id` shared by startup, config, and dispatch events.
 `hatch` logs startup immediately and includes the config path (or `<default>` hint followed by the resolved path event).
