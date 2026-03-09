@@ -120,6 +120,13 @@ Validate configuration without executing anything:
 hatch check ./path/to/config.yaml
 ```
 
+List available command keys from config:
+
+```bash
+hatch list
+hatch -c ./path/to/config.yaml list
+```
+
 ## Use Cases
 
 ### Headless Linux Devices

@@ -15,4 +15,5 @@ pub struct Cli {
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum Command {
     Check { path: PathBuf },
+    List,
 }

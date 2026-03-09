@@ -73,6 +73,62 @@ fn check_reports_missing_config_file() {
 }
 
 #[test]
+fn list_prints_available_commands_from_config_flag() {
+    let temp = TestDir::new();
+    let config = temp.write_config(
+        "list.yaml",
+        r#"
+commands:
+  restart-app:
+    run: systemctl restart app
+  lock-screen:
+    run: loginctl lock-session
+"#,
+    );
+
+    let output = hatch_command()
+        .arg("--config")
+        .arg(&config)
+        .arg("list")
+        .output()
+        .expect("list command should run");
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "lock-screen\nrestart-app\n"
+    );
+    assert!(String::from_utf8_lossy(&output.stderr).is_empty());
+}
+
+#[test]
+fn list_uses_default_config_path_from_xdg_config_home() {
+    let temp = TestDir::new();
+    let config_dir = temp.create_dir("xdg/hatch");
+    let config = config_dir.join("hatch.yaml");
+
+    fs::write(
+        &config,
+        r#"
+commands:
+  ping:
+    run: printf pong
+"#,
+    )
+    .expect("config file should be written");
+
+    let output = hatch_command()
+        .arg("list")
+        .env("XDG_CONFIG_HOME", temp.path().join("xdg"))
+        .output()
+        .expect("list command should run");
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "ping\n");
+    assert!(String::from_utf8_lossy(&output.stderr).is_empty());
+}
+
+#[test]
 fn dispatch_returns_executed_command_exit_code() {
     let temp = TestDir::new();
     let config = temp.write_config(

@@ -63,6 +63,14 @@ fn parses_check_subcommand() {
 }
 
 #[test]
+fn parses_list_subcommand() {
+    let cli = Cli::parse_from(["hatch", "list"]);
+
+    assert_eq!(cli.config, None);
+    assert_eq!(cli.command, Some(Command::List));
+}
+
+#[test]
 fn resolves_default_path_from_xdg_config_home() {
     let _env_lock = lock_env();
     let _xdg_guard = EnvVarGuard::capture("XDG_CONFIG_HOME");

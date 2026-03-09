@@ -7,4 +7,4 @@
   - [x] `cwd`
   - [x] `env`
 - [x] Logging
-- [ ] `hatch list` to list available commands in config
+- [x] `hatch list` to list available commands in config

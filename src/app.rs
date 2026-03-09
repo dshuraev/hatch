@@ -30,6 +30,26 @@ pub fn run(cli: Cli) -> Result<RunOutcome, AppError> {
             check_config();
             Ok(RunOutcome::ExitCode(ExitCode::SUCCESS))
         }
+        Some(Command::List) => {
+            let config_hint = cli
+                .config
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "<default>".to_string());
+            logger.log(
+                Level::Info,
+                "startup",
+                &dispatch_id,
+                vec![
+                    ("mode", "list".to_string()),
+                    ("config_path_hint", config_hint),
+                ],
+            );
+
+            let config = load_runtime_config(cli.config, &logger, &dispatch_id)?;
+            list_commands(&config);
+            Ok(RunOutcome::ExitCode(ExitCode::SUCCESS))
+        }
         None => {
             let config_hint = cli
                 .config
@@ -46,46 +66,51 @@ pub fn run(cli: Cli) -> Result<RunOutcome, AppError> {
                 ],
             );
 
-            let path = match cli.config {
-                Some(path) => path,
-                None => match Config::default_path() {
-                    Ok(path) => path,
-                    Err(error) => {
-                        logger.log(
-                            Level::Error,
-                            "config_path_resolution_failed",
-                            &dispatch_id,
-                            vec![("error", error.to_string())],
-                        );
-                        return Err(AppError::Internal);
-                    }
-                },
-            };
-            logger.log(
-                Level::Info,
-                "config_path_resolved",
-                &dispatch_id,
-                vec![("config_path", path.display().to_string())],
-            );
-
-            let config = match Config::load_from_path(&path) {
-                Ok(config) => config,
-                Err(error) => {
-                    logger.log(
-                        Level::Error,
-                        "config_load_failed",
-                        &dispatch_id,
-                        vec![
-                            ("config_path", path.display().to_string()),
-                            ("error", error.to_string()),
-                        ],
-                    );
-                    return Err(AppError::Internal);
-                }
-            };
+            let config = load_runtime_config(cli.config, &logger, &dispatch_id)?;
             run_config(&config, &logger, &dispatch_id)
         }
     }
+}
+
+fn load_runtime_config(
+    config_path: Option<std::path::PathBuf>,
+    logger: &Logger,
+    dispatch_id: &str,
+) -> Result<Config, AppError> {
+    let path = match config_path {
+        Some(path) => path,
+        None => match Config::default_path() {
+            Ok(path) => path,
+            Err(error) => {
+                logger.log(
+                    Level::Error,
+                    "config_path_resolution_failed",
+                    dispatch_id,
+                    vec![("error", error.to_string())],
+                );
+                return Err(AppError::Internal);
+            }
+        },
+    };
+    logger.log(
+        Level::Info,
+        "config_path_resolved",
+        dispatch_id,
+        vec![("config_path", path.display().to_string())],
+    );
+
+    Config::load_from_path(&path).map_err(|error| {
+        logger.log(
+            Level::Error,
+            "config_load_failed",
+            dispatch_id,
+            vec![
+                ("config_path", path.display().to_string()),
+                ("error", error.to_string()),
+            ],
+        );
+        AppError::Internal
+    })
 }
 
 fn run_config(config: &Config, logger: &Logger, dispatch_id: &str) -> Result<RunOutcome, AppError> {
@@ -95,6 +120,12 @@ fn run_config(config: &Config, logger: &Logger, dispatch_id: &str) -> Result<Run
 
 fn check_config() {
     println!("config is valid");
+}
+
+fn list_commands(config: &Config) {
+    for command in config.commands.keys() {
+        println!("{command}");
+    }
 }
 
 fn outcome_from_status(status: std::process::ExitStatus) -> RunOutcome {
