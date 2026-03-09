@@ -6,5 +6,5 @@
   - [ ] `timeout`
   - [ ] `cwd`
   - [ ] `env`
-- [ ] Logging
+- [x] Logging
 - [ ] `hatch list` to list available commands in config
