@@ -82,7 +82,7 @@ task coupling
 
 GitHub Actions defines two repository workflows:
 
-* `CI`: runs on pull requests and pushes to `main`
+* `CI`: runs on pull requests and pushes to `master`
 * `Release`: runs when a `v*` tag is pushed
 
 The blocking CI gate is intentionally narrow:
